@@ -1,0 +1,18 @@
+{
+  "name": "advent-of-code-2024",
+  "version": "1.0.0",
+  "description": "My solutions for the Advent of Code 2024",
+  "main": "index.ts",
+  "repository": "https://github.com/gardusi/advent-of-code-2024.git",
+  "author": "Giovanni Gardusi <giovanni.gardusi@gmail.com>",
+  "scripts": {
+    "start": "ts-node index.ts"
+  },
+  "dependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1"
+  }
+}
