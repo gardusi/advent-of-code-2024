@@ -4,12 +4,9 @@ type Coords = [number, number]
 
 type Direction = '^' | '>' | 'v' | '<'
 
-type Rotational = 'clockwise' | 'counterclockwise'
-
 type Guard = {
     position: Coords
-    direction: Direction,
-    rotational: Rotational
+    direction: Direction
 }
 
 type Tile = {
@@ -28,8 +25,7 @@ const mY = grid[0].length
 
 let guard: Guard = {
     position: [0, 0],
-    direction: '^',
-    rotational: 'clockwise'
+    direction: '^'
 }
 
 const ahead = ({ position, direction }: Guard) => {
@@ -46,17 +42,14 @@ const ahead = ({ position, direction }: Guard) => {
     }
 }
 
-const turn = ({ direction, rotational }: Guard) => {
-    switch (direction) {
-        case '^':
-            return rotational === 'clockwise' ? '>' : '<'
-        case '>':
-            return rotational === 'clockwise' ? 'v' : '^'
-        case 'v':
-            return rotational === 'clockwise' ? '<' : '>'
-        case '<':
-            return rotational === 'clockwise' ? '^' : 'v'
+const turn = ({ direction }: Guard) => {
+    const rotation: Record<Direction, Direction> = {
+        '^': '>',
+        '>': 'v',
+        'v': '<',
+        '<': '^',
     }
+    return rotation[direction]
 }
 
 const entireColumn = (path: Tile[][], y: number) => {
@@ -67,19 +60,31 @@ const entireRow = (path: Tile[][], x: number) => {
     return path[x]
 }
 
-const canLoop = (guard: Guard, path: Tile[][]) => {
-    const rotation: Record<Direction, Record<Rotational, Direction[]>> = {
-        '<': { clockwise: ['^', 'v'], counterclockwise: ['v', '^'] },
-        '^': { clockwise: ['>', '<'], counterclockwise: ['<', '>'] },
-        '>': { clockwise: ['v', '^'], counterclockwise: ['^', 'v'] },
-        'v': { clockwise: ['<', '>'], counterclockwise: ['>', '<'] },
+const alignedWithPreviousPath = (guard: Guard, tile: Tile) => {
+    const rotation: Record<Direction, Direction[]> = {
+        '<': ['^'],
+        '^': ['>'],
+        '>': ['v'],
+        'v': ['<'],
     }
+
+    return rotation[guard.direction]
+        .some((direction) => tile.directions.includes(direction))
+}
+
+const canLoop = (guard: Guard, path: Tile[][]) => {
     if (guard.direction === '<' || guard.direction === '>') {
         const column = entireColumn(path, guard.position[1]).filter(tile => tile.directions.length > 0)
-        return column.some((tile) => rotation[guard.direction][guard.rotational].some((direction) => tile.directions.includes(direction)))
+
+        // console.log(column.map(tile => tile.directions))
+
+        return column.some((tile) => alignedWithPreviousPath(guard, tile))
     }
     const row = entireRow(path, guard.position[0]).filter(tile => tile.directions.length > 0)
-    return row.some((tile) => rotation[guard.direction][guard.rotational].some((direction) => tile.directions.includes(direction)))
+
+    // console.log(row.map(tile => tile.directions))
+
+    return row.some((tile) => alignedWithPreviousPath(guard, tile))
 }
 
 const move = (guard: Guard, grid: string[][], path: Tile[][]) => {
@@ -91,9 +96,15 @@ const move = (guard: Guard, grid: string[][], path: Tile[][]) => {
 
     switch (grid[nx][ny]) {
         case '#':
-            path[guard.position[0]][guard.position[1]].directions.push(guard.direction)
+            // path[guard.position[0]][guard.position[1]].directions.push(guard.direction)
             guard.direction = turn(guard)
             path[guard.position[0]][guard.position[1]].directions.push(guard.direction)
+
+            if (canLoop(guard, path)) {
+                const [ox, oy] = ahead(guard)
+                path[ox][oy].obstacle += 1
+            }
+            
             return true
         default:
             guard.position = [nx, ny]
@@ -134,10 +145,18 @@ const main = async (debug: boolean) => {
     let count = 0;
     do {
         if (debug) {
-            console.log(path.map(row => row.map(tile => tile.obstacle > 0 ? 'O' : tile.directions.length > 0 ? 'X' : '.').join('')).join('\n'))
+            console.log(path.map((row) => row.map((tile) => tile.directions.length === 1 ? tile.directions[0] : tile.directions.length > 1 ? '*' : '.').join('')).join('\n'))
+
+            console.log('')
+            console.log('-'.repeat(mY))
+            console.log('')
+
+            console.log(path.map((row, i) => row.map((tile, j) => guard.position[0] === i && guard.position[1] === j ? guard.direction : tile.obstacle > 0 ? 'O' : tile.directions.length > 0 ? 'X' : '.').join('')).join('\n'))
             console.log('Count:', count)
             await new Promise(resolve => process.stdin.once('data', resolve))
-            console.clear()
+            
+            // await new Promise(resolve => setTimeout(resolve, 1))
+            // console.clear()
             count++
         }
     } while (move(guard, grid, path))
@@ -155,4 +174,4 @@ const main = async (debug: boolean) => {
     console.log('Obstacles:', obstacleCount)
 }
 
-main(true)
+main(false)
