@@ -34,16 +34,16 @@ const part2Operations: Operation[] = [
     (a, b) => Number(`${a}${b}`), // concatenation
 ]
 
-const splitSum = (sumNode: SumNode, equation: Equation, index: number, sums: number[], operations: Operation[]) => {
+const splitSum = (sumNode: SumNode, numbers: number[], index: number, sums: number[], operations: Operation[]) => {
     const sum = sumNode.sum || 0
     delete sumNode.sum
 
-    const children = operations.map(operation => ({ sum: operation(sum, equation.numbers[index]) }))
+    const children = operations.map(operation => ({ sum: operation(sum, numbers[index]) }))
     sumNode.children = children
 
-    if (index < equation.numbers.length - 1) {
+    if (index < numbers.length - 1) {
         for (const child of sumNode.children) {
-            splitSum(child, equation, index + 1, sums, operations)
+            splitSum(child, numbers, index + 1, sums, operations)
         }
         return
     }
@@ -58,7 +58,7 @@ const runEquations = (operations: Operation[]) => {
         }
 
         const sums: number[] = []
-        splitSum(sumTree, equation, 1, sums, operations)
+        splitSum(sumTree, equation.numbers, 1, sums, operations)
 
         if (sums.includes(equation.result)) {
             totalSum += equation.result
