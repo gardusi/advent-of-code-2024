@@ -1,13 +1,21 @@
 import { readFileSync } from 'fs'
 
+const START = '0'
+const END = '9'
+const DIFF = 1
+
 type Location = { i: number, j: number }
+
+type TailTrail = Location & { l: number }
 
 const topographicMap = readFileSync('./problems/day10/input.txt', 'utf8')
     .replaceAll('\r', '')
     .split('\n')
     .map(line => line.split(''))
 
-console.log(topographicMap)
+const printPath = (path: boolean[][]) => {
+    console.log(path.map(row => row.map(cell => cell ? 'X' : ' ').join('')).join('\n'))
+}
 
 const readMap = <T>(map: T[][], { i, j }: Location) => map[i][j]
 
@@ -18,6 +26,8 @@ const setMap = <T>(map: T[][], { i, j }: Location, value: T) => {
 const emptyMap = (mI: number, mJ: number) =>
         Array.from({ length: mI }, () => Array.from({ length: mJ }, () => false))
 
+const copyMap = <T>(map: T[][]) => map.map(row => row.slice())
+
 const isBounded = ({ i, j }: Location, mI: number, mJ: number) => i >= 0 && i < mI && j >= 0 && j < mJ
 
 const isSmoothSlope = (map: string[][], origin: Location, destination: Location) => {
@@ -26,7 +36,7 @@ const isSmoothSlope = (map: string[][], origin: Location, destination: Location)
         return false
     }
     const current = readMap(map, origin)
-    return Number(current) - Number(next) === 1
+    return Number(next) - Number(current) === DIFF
 }
 
 const isValidMoviment = (map: string[][], path: boolean[][], origin: Location, destination: Location) =>
@@ -41,19 +51,19 @@ const getMovements = (map: string[][], path: boolean[][], { i, j }: Location) =>
     ].filter((movement) => isValidMoviment(map, path, { i, j }, movement))
 }
 
-const reachTrailtails = (map: string[][], path: boolean[][], trailtails: Location[], current: Location) => {
+const reachTrailtails = (map: string[][], path: boolean[][], trailtails: TailTrail[], current: Location, l: number, copy: boolean) => {
     const movements = getMovements(map, path, current)
     
     for (const movement of movements) {
         setMap(path, movement, true)
-        if (readMap(map, movement) === '9') {
-            trailtails.push(movement)
+        if (readMap(map, movement) === END) {
+            trailtails.push({ ...movement, l })
             continue
         }
-        reachTrailtails(map, path, trailtails, movement)
+        reachTrailtails(map, copy ? copyMap(path) : path, trailtails, movement, l + 1, copy)
     }
 
-    return path
+    return trailtails
 }
 
 const getTrailheads = (map: string[][]) => {
@@ -61,7 +71,7 @@ const getTrailheads = (map: string[][]) => {
     for (let i = 0; i < map.length; i++) {
         for (let j = 0; j < map[i].length; j++) {
             const cell = readMap(map, { i, j })
-            if (cell === '0') {
+            if (cell === START) {
                 trailheads.push({ i, j })
             }
         }
@@ -69,16 +79,30 @@ const getTrailheads = (map: string[][]) => {
     return trailheads
 }
 
-const departFromTrailheads = (map: string[][]) => {
+const departFromTrailheads = (map: string[][], copy: boolean) => {
     const trailheads: Location[] = getTrailheads(map)
-    const trailtails: Location[] = []
+    const trailtails: Location[][] = []
     for (const { i, j } of trailheads) {
         const path = emptyMap(map.length, map[i].length)
-        reachTrailtails(map, path, trailtails, { i, j })
+
+        trailtails.push(reachTrailtails(map, path, [], { i, j }, 0, copy))
+
+        if (!copy) {
+            printPath(path)
+        }
     }
     return trailtails
 }
 
-const trailtails = departFromTrailheads(topographicMap)
+const trailtailScore = departFromTrailheads(topographicMap, false)
+    .map((t) => t.length)
+    .reduce((a, b) => a + b, 0)
 
-console.log(trailtails)
+console.log('\nTrailtail Score:', trailtailScore)
+
+const trailtailRating = departFromTrailheads(topographicMap, true)
+    .map((t) => t.length)
+    .reduce((a, b) => a + b, 0)
+
+console.log('Trailtail Rating:', trailtailRating)
+
