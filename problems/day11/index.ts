@@ -39,12 +39,14 @@ const run = (stones: string[], limit: number, debug: boolean) => {
 
 const superRun = (uniqueStones: Stone[], limit: number) => {
     const originalLength = uniqueStones.length
+    const newUniqueStones: Stone[] = []
     for (let i = 0; i < originalLength; i++) {
         const moreStones = run([uniqueStones[i].label], limit, false)
         const partialUniqueStones = getUniqueStones(moreStones, uniqueStones[i].count)
         
-        putUniqueStones(uniqueStones, partialUniqueStones, uniqueStones[i].count)
+        putUniqueStones(newUniqueStones, partialUniqueStones)
     }
+    return newUniqueStones
 }
 
 const getUniqueStones = (stones: string[], count: bigint) => {
@@ -60,7 +62,7 @@ const getUniqueStones = (stones: string[], count: bigint) => {
     return uniqueStones
 }
 
-const putUniqueStones = (uniqueStones: Stone[], stones: Stone[], count: bigint) => {
+const putUniqueStones = (uniqueStones: Stone[], stones: Stone[]) => {
     for (const stone of stones) {
         const i = uniqueStones.findIndex(s => s.label === stone.label)
         if (uniqueStones[i]) {
@@ -81,12 +83,14 @@ const stones = run(input, CYCLE_1, true)
 
 const uniqueStones: Stone[] = getUniqueStones(stones, 1n)
 
-superRun(uniqueStones, CYCLE_2)
-let superLength = uniqueStones.reduce((acc, stone) => acc + stone.count, 0n)
+const newUniqueStones = superRun(uniqueStones, CYCLE_2)
+
+let superLength = newUniqueStones.reduce((acc, stone) => acc + stone.count, 0n)
 
 console.log('After', CYCLE_1 + CYCLE_2, 'blinks we have', superLength, 'stones')
 
-superRun(uniqueStones, CYCLE_3)
-superLength = uniqueStones.reduce((acc, stone) => acc + stone.count, 0n)
+const newNewUniqueStones = superRun(newUniqueStones, CYCLE_3)
+
+superLength = newNewUniqueStones.reduce((acc, stone) => acc + stone.count, 0n)
 
 console.log('After', CYCLE_1 + CYCLE_2 + CYCLE_3, 'blinks we have', superLength, 'stones')
