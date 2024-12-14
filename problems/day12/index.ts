@@ -6,6 +6,12 @@ type Region = {
     path: boolean[][]
     perimeter: number
     area: number
+    sides: number
+}
+
+type Direction = {
+    previous: boolean
+    next: boolean
 }
 
 const input = readFileSync('./problems/day12/input.txt', 'utf8')
@@ -91,15 +97,51 @@ const mapAllRegions = (map: string[][]) => {
             const path = emptyMap(map.length, map[i].length)
             const perimeter = mapRegion(map, path, { i, j }, 0)
             const area = getArea(path)
-            regions.push({ path, perimeter, area })
+            regions.push({ path, perimeter, area, sides: NaN })
         }
     }
     console.log('Regions found:', regions.length)
     return regions
 }
 
-const regions = mapAllRegions(input)
+const countSides = (scan: boolean[]) => scan.join('').split('false').filter(Boolean).length
 
-const fenceCost = regions.reduce((total, { area, perimeter }) => total + area * perimeter, 0)
+const getSideCount = (path: boolean[][]) => {
+    let sideCount = 0
+
+    for (let i = 0; i < path.length; i++) {
+        const up = path[i].map((value, j) => value && (i <= 0 || !readMap(path, { i: i - 1, j })))
+        const down = path[i].map((value, j) => value && (i >= path.length - 1 || !readMap(path, { i: i + 1, j })))
+
+        sideCount += countSides(up)
+        sideCount += countSides(down)
+    }
+
+    for (let j = 0; j < path[0].length; j++) {
+        const left = path.map((col, i) => col[j] && (j <= 0 || !readMap(path, { i, j: j - 1 })))
+        const right = path.map((col, i) => col[j] && (j >= path[0].length - 1 || !readMap(path, { i, j: j + 1 })))
+
+        sideCount += countSides(left)
+        sideCount += countSides(right)
+    }
+
+    return sideCount
+}
+
+const regions = mapAllRegions(input)
+for (const region of regions) {
+    region.sides = getSideCount(region.path)
+    console.log('Sides:', region.sides)
+}
+
+const fenceCost = regions.reduce((totals, { area, perimeter, sides }) => ({
+    full: totals.full + area * perimeter,
+    discounted: totals.discounted + area * sides,
+}), { full: 0, discounted: 0 })
 
 console.log('Total fence cost:', fenceCost)
+
+
+const readColumn = <T>(map: T[][], j: number) => {
+    return map.map((v) => v[j])
+}
