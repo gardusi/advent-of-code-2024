@@ -9,11 +9,6 @@ type Region = {
     sides: number
 }
 
-type Direction = {
-    previous: boolean
-    next: boolean
-}
-
 const input = readFileSync('./problems/day12/input.txt', 'utf8')
     .replaceAll('\r', '')
     .split('\n')
