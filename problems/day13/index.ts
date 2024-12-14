@@ -11,36 +11,41 @@ const input = readFileSync('./problems/day13/input.txt', 'utf8')
     .split('\n\n')
     .map((machine) => machine.split('\n'))
 
-const machines = input.map((machine) => ({
-    buttonA: machine[0].match(/\d+/ig)!.map(BigInt),
-    buttonB: machine[1].match(/\d+/ig)!.map(BigInt),
-    prize: machine[2].match(/\d+/ig)!.map(BigInt),
-}))
+const getMachines = (input: string[][], part: 1 | 2) =>
+    input.map((machine) => ({
+        buttonA: machine[0].match(/\d+/ig)!.map(BigInt),
+        buttonB: machine[1].match(/\d+/ig)!.map(BigInt),
+        prize: machine[2].match(/\d+/ig)!.map((v) => BigInt(v) + (part === 1 ? 0n : 10000000000000n)),
+    }))
 
-const computePossibilities = ({ buttonA, buttonB, prize }: Machine) => {
-    const possibilities: [bigint, bigint][] = []
-    for (let a = 0n; a * buttonA[0] <= prize[0] && a * buttonA[1] <= prize[1]; a++) {
-        for (let b = 0n; b * buttonB[0] <= prize[0] && b * buttonB[1] <= prize[1]; b++) {
-            const x = a * buttonA[0] + b * buttonB[0]
-            const y = a * buttonA[1] + b * buttonB[1]
-            
-            if (x === prize[0] && y === prize[1]) {
-                possibilities.push([a, b])
-            }
-            if (x > prize[0] || y > prize[1]) {
-                break
-            }
-        }
+const computePossibility = ({ buttonA, buttonB, prize }: Machine) => {
+    //  [ xa   xb ][ a ] = [ x ]
+    //  [ ya   yb ][ b ] = [ y ]
+    //
+    //  [ a ] =  1 [ yb  -xb ][ x ]
+    //  [ b ] =  D [ -ya  xa ][ y ]
+    //
+    //  [ a ] = 1 [ x*yb - y*xb ]
+    //  [ b ] = D [ y*xa - x*ya ]
+
+    const [xa, ya] = buttonA
+    const [xb, yb] = buttonB
+    const [x, y] = prize
+
+    const det = Number(xa*yb - xb*ya);
+    const [a, b] = [x*yb - y*xb, y*xa - x*ya].map((v) => Number(v) / det)
+    if (a % 1 === 0 && b % 1 === 0) {
+        return [a, b]
     }
-    return possibilities
+    return [0, 0]
 }
 
-let totalSpent = 0n
-for (const machine of machines) {
-    const possibilities = computePossibilities(machine)
-
-    const cheapestPossibility = possibilities.reduce((c, [a, b]) => c === 0n || (a * 3n + b) < c ? a * 3n + b : c, 0n)
-    totalSpent += cheapestPossibility
+let totalSpent = 0
+for (const machine of getMachines(input, 2)) {
+    const [a, b] = computePossibility(machine)
+    if (a && b) {
+        totalSpent += a * 3 + b
+    }
 }
 
 console.log('Minimum total spent:', totalSpent)
