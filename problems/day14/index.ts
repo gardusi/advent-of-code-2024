@@ -51,31 +51,48 @@ const printResult = (positions: [bigint, bigint][]) => {
 const hx = (WIDE - 1n) / 2n
 const hy = (TALL - 1n) / 2n
 
-const quadrants = [0, 0, 0, 0]
-const positions: [bigint, bigint][] = []
-for (const robot of getRobots(input)) {
-    const [x, y] = computePosition(robot, 100n, [WIDE, TALL])
-    positions.push([x, y])
-
-    if (x > hx && y < hy) {
-        quadrants[0]++
+const computeQuadrants = (seconds: bigint) => {
+    const quadrants = [0, 0, 0, 0]
+    const positions: [bigint, bigint][] = []
+    for (const robot of getRobots(input)) {
+        const [x, y] = computePosition(robot, seconds, [WIDE, TALL])
+        positions.push([x, y])
+    
+        if (x < hx && y < hy) quadrants[0]++
+        if (x > hx && y < hy) quadrants[1]++
+        if (x < hx && y > hy) quadrants[2]++
+        if (x > hx && y > hy) quadrants[3]++
     }
-    if (x < hx && y > hy) {
-        quadrants[1]++
-    }
-    if (x < hx && y < hy) {
-        quadrants[2]++
-    }
-    if (x > hx && y > hy) {
-        quadrants[3]++
-    }
+    return { quadrants, positions }
 }
 
-const safetyFactor = quadrants[0] * quadrants[1] * quadrants[2] * quadrants[3]
-console.log('Quadrants:', quadrants)
-console.log('Safety factor:', safetyFactor)
+const result = computeQuadrants(100n);
+const [A, B, C, D] = result.quadrants
+console.log('Safety factor:', A * B * C * D)
 
-printResult(positions)
+let positions: [bigint, bigint][] = []
 
-// 71631250
-// 89164800
+// Obtained by looping and checking when every robot is back to their initial position
+const cycleTime = 10403n
+
+let promissingCandidate = {
+    seconds: 0n,
+    factor: 0n
+}
+
+let seconds = 1n
+while(seconds < cycleTime) {
+    const result = computeQuadrants(seconds)
+    const [A, B, C, D] = result.quadrants
+    positions = result.positions
+
+    const factor = BigInt(A * B * C * D)
+
+    if (promissingCandidate.factor === 0n || factor < promissingCandidate.factor) {
+        console.log('Promissing candidate at', seconds, 'below:')
+        printResult(positions)
+
+        promissingCandidate = { seconds, factor }
+    }
+    seconds++
+}
