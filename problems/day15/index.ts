@@ -2,15 +2,19 @@ import { readFileSync } from "fs"
 
 type Direction = '^' | '>' | 'v' | '<'
 type Location = { i: number, j: number }
-type Robot = {
-    location: Location
-}
 
 const [rawBoard, rawMoves] = readFileSync('./problems/day15/input.txt', 'utf8')
     .replaceAll('\r', '')
     .split('\n\n')
 
-const board = rawBoard.split('\n').map((row) => row.split(''))
+const board = rawBoard.split('\n')
+    .map((row) => row
+        // .replaceAll('#', '##')
+        // .replaceAll('O', '[]')
+        // .replaceAll('.', '..')
+        // .replaceAll('@', '@.')
+        .split('')
+    )
 const moves = rawMoves.split('')
 
 // ------- PRINTING -------
@@ -23,7 +27,7 @@ const printCoords = (board: string[][]) => {
     let sum = 0
     for (let i = 0; i < board.length; i++) {
         for (let j = 0; j < board[0].length; j++) {
-            if (readBoard(board, { i, j }) === 'O') {
+            if (['O', '['].includes(readBoard(board, { i, j }))) {
                 sum += 100 * i + j
             }
         }
@@ -49,26 +53,97 @@ const getCommand = (key: string): string | undefined => {
 
 const readBoard = <T>(board: T[][], { i, j }: Location) => board[i][j]
 
-const getRobot = (board: string[][]): Robot => {
+const getRobot = (board: string[][]): Location => {
     for (let i = 0; i < board.length; i++) {
         for (let j = 0; j < board[0].length; j++) {
             if (readBoard(board, { i, j }) === '@') {
-                return { location: { i, j }}
+                return { i, j }
             }
         }
     }
     throw new Error('Could not find a robot, you probably copied the input incorrectly.')
 }
 
-const moveLeft = (board: string[][], robot: Robot) => {
-    const start = robot.location.j
-    const i = robot.location.i
+const canMoveUp = (board: string[][], subrobot: Location): boolean => {
+    const { i, j } = subrobot
+    const block = readBoard(board, { i: i - 1, j })
+    if (block === '#') {
+        return false
+    }
+    if (block === '.') {
+        return true
+    }
+    if (block === 'O') {
+        return canMoveUp(board, { i: i - 1, j })
+    }
+    const nJ = block === '[' ? j + 1 : j - 1
+    return canMoveUp(board, { i: i - 1, j }) && canMoveUp(board, { i: i - 1, j: nJ })
+}
+
+const canMoveDown = (board: string[][], subrobot: Location): boolean => {
+    const { i, j } = subrobot
+    const block = readBoard(board, { i: i + 1, j })
+    if (block === '#') {
+        return false
+    }
+    if (block === '.') {
+        return true
+    }
+    if (block === 'O') {
+        return canMoveDown(board, { i: i + 1, j })
+    }
+    const nJ = block === '[' ? j + 1 : j - 1
+    return canMoveDown(board, { i: i + 1, j }) && canMoveDown(board, { i: i + 1, j: nJ })
+}
+
+const swapAbove = ({ i, j }: Location) => {
+    [board[i + 1][j], board[i][j]] = [board[i][j], board[i + 1][j]]
+}
+
+const swapBelow = ({ i, j }: Location) => {
+    [board[i - 1][j], board[i][j]] = [board[i][j], board[i - 1][j]]
+}
+
+const doMoveUp = (board: string[][], subrobot: Location) => {
+    const { i, j } = subrobot
+    const block = readBoard(board, { i: i - 1, j })
+    if (block === '.') {
+        swapAbove({ i: i - 1, j })
+        return
+    }
+    doMoveUp(board, { i: i - 1, j })
+    if (block !== 'O') {
+        const nJ = block === '[' ? j + 1 : j - 1
+        doMoveUp(board, { i: i - 1, j: nJ })
+    }
+    swapAbove({ i: i - 1, j })
+}
+
+
+const doMoveDown = (board: string[][], subrobot: Location) => {
+    const { i, j } = subrobot
+    const block = readBoard(board, { i: i + 1, j })
+    if (block === '.') {
+        swapBelow({ i: i + 1, j })
+        return
+    }
+    doMoveDown(board, { i: i + 1, j })
+    if (block !== 'O') {
+        const nJ = block === '[' ? j + 1 : j - 1
+        doMoveDown(board, { i: i + 1, j: nJ })
+    }
+    swapBelow({ i: i + 1, j })
+}
+
+const moveLeft = (board: string[][], robot: Location) => {
+    const start = robot.j
+    const i = robot.i
 
     let pushCount = 1
     for (let j = start - 1; j >= 0; j--) {
         const block = readBoard(board, { i, j })
         if (block === '#') {
-            return
+            return false
         }
         if (block === '.') {
             break
@@ -78,18 +153,19 @@ const moveLeft = (board: string[][], robot: Robot) => {
 
     const [number] = board[i].splice(start - pushCount, 1)
     board[i].splice(start, 0, number)
-    robot.location = { i, j: start - 1 }
+    robot.j = start - 1
+    return true
 }
 
-const moveRight = (board: string[][], robot: Robot) => {
-    const start = robot.location.j
-    const i = robot.location.i
+const moveRight = (board: string[][], robot: Location) => {
+    const start = robot.j
+    const i = robot.i
 
     let pushCount = 1
     for (let j = start + 1; j < board[i].length; j++) {
         const block = readBoard(board, { i, j })
         if (block === '#') {
-            return
+            return false
         }
         if (block === '.') {
             break
@@ -99,56 +175,59 @@ const moveRight = (board: string[][], robot: Robot) => {
 
     const [number] = board[i].splice(start + pushCount, 1)
     board[i].splice(start, 0, number)
-    robot.location = { i, j: start + 1 }
+    robot.j = start + 1
+    return true
 }
 
-const moveUp = (board: string[][], robot: Robot) => {
-    const start = robot.location.i
-    const j = robot.location.j
+const moveUp = (board: string[][], robot: Location) => {
+    const start = robot.i
+    const j = robot.j
 
-    let pushCount = 1
     for (let i = start - 1; i >= 0; i--) {
         const block = readBoard(board, { i, j })
         if (block === '#') {
-            return
+            return false
         }
         if (block === '.') {
             break
         }
-        pushCount++
+        if (!canMoveUp(board, robot)) {
+            return false
+        }
     }
-    for (let p = pushCount; p > 0; p--) {
-        const a = start - p
-        const b = start - p + 1
-        ;[board[a][j], board[b][j]] = [board[b][j], board[a][j]]
-    }
-    robot.location = { i: start - 1, j }
+
+    doMoveUp(board, robot)
+
+    robot.i = start - 1
+    return true
 }
 
-const moveDown = (board: string[][], robot: Robot) => {
-    const start = robot.location.i
-    const j = robot.location.j
+const moveDown = (board: string[][], robot: Location) => {
+    const start = robot.i
+    const j = robot.j
 
     let pushCount = 1
     for (let i = start + 1; i < board.length; i++) {
         const block = readBoard(board, { i, j })
         if (block === '#') {
-            return
+            return false
         }
         if (block === '.') {
             break
         }
+        if (!canMoveDown(board, robot)) {
+            return false
+        }
         pushCount++
     }
-    for (let p = pushCount; p > 0; p--) {
-        const a = start + p
-        const b = start + p - 1
-        ;[board[a][j], board[b][j]] = [board[b][j], board[a][j]]
-    }
-    robot.location = { i: start + 1, j }
+
+    doMoveDown(board, robot)
+
+    robot.i = start + 1
+    return true
 }
 
-const makeMovement = (board: string[][], robot: Robot, direction: Direction) => {
+const makeMovement = (board: string[][], robot: Location, direction: Direction) => {
     if (direction === '<') moveLeft(board, robot)
     if (direction === '>') moveRight(board, robot)
     if (direction === '^') moveUp(board, robot)
