@@ -23,8 +23,6 @@ const setMap = <T>(map: T[][], { i, j }: Coords, value: T) => {
     map[i][j] = value
 }
 
-const isSame = (a: Coords, b?: Coords) => b && a.i === b.i && a.j === b.j
-
 const addWeight = (a: Coords, b?: Coords) => (!b || (a.i !== b.i && a.j !== b.j)) ? 1001 : 1
 
 const cornerCase = (map: string[][], { i, j }: Coords) => readMap(map, { i, j }) === 'x' ? 1000 : 0 
@@ -34,52 +32,30 @@ const emptyMap = <T>(mI: number, mJ: number, value: T) =>
 
 const copyMap = <T>(map: T[][]) => map.map(row => row.slice())
 
-const isValidVisited = (map: string[][], destination: Coords) => {
+const isValidMoviment = (map: string[][], destination: Coords) => {
     const next = readMap(map, destination)
     return next === '.' || next === 'x' || next === 'E'
 }
 
-const isValidMoviment = (map: string[][], visited: boolean[][], destination: Coords, previous?: Coords) =>
-    !isSame(destination, previous) && !readMap(visited, destination) && isValidVisited(map, destination)
+const getMovements = (map: string[][], nodes: Node[][], current: Location) => {
+    const { i, j } = current
 
-const getMovements = (map: string[][], visited: boolean[][], { i, j, w }: Location, previous?: Location) => {
     const directions = [
         { i: i - 1, j },
         { i: i + 1, j },
         { i, j: j - 1 },
         { i, j: j + 1 }
-    ].filter((direction) => isValidMoviment(map, visited, direction, previous))
+    ].filter((direction) => isValidMoviment(map, direction))
 
-    return directions.map((dir) => ({ ...dir, w: w + addWeight(dir, previous) - cornerCase(map, dir) }))
-}
+    return directions.map((direction) => {
+        const p1 = readMap(nodes, current)
+        const p2 = readMap(nodes, direction)
 
-const reachTrailtails = (map: string[][], visited: boolean[][], nodes: Node[][], trailtails: Location[], current: Location, previous: Location | undefined, copy: boolean) => {
-    setMap(visited, current, true)
+        const w1 = current.w + addWeight(direction, p1) - cornerCase(map, direction)
+        const w2 = p2.w + addWeight(direction, p2) - cornerCase(map, direction)
 
-    if (readMap(nodes, current).w > current.w) {
-        setMap(nodes, current, { ...previous, w: current.w })
-    }
-
-    const movements = getMovements(map, visited, current, previous)
-    
-    for (const movement of movements) {
-        if (readMap(map, movement) === END) {
-            setMap(visited, movement, true)
-
-            if (readMap(nodes, movement).w > movement.w) {
-                setMap(nodes, movement, { ...previous, w: movement.w })
-            }
-
-            console.log(readMap(nodes, movement))
-            
-            printVisited(visited)
-            trailtails.push(movement)
-            continue
-        }
-        reachTrailtails(map, copy ? copyMap(visited) : visited, nodes, trailtails, movement, current, copy)
-    }
-
-    return trailtails
+        return { ...direction, w: Math.min(w1, w2) }
+    })
 }
 
 const getTrailheads = (map: string[][]) => {
@@ -95,24 +71,52 @@ const getTrailheads = (map: string[][]) => {
     return trailheads
 }
 
-const departFromTrailheads = (map: string[][], copy: boolean) => {
+const departFromTrailheads = (map: string[][]) => {
     const trailheads: Location[] = getTrailheads(map)
-    const trailtails: Location[][] = []
-    for (const current of trailheads) {
+    const trailtailGroups: Location[][] = []
+    for (const trailhead of trailheads) {
         const visited = emptyMap(map.length, map[0].length, false)
         const nodes = emptyMap<Node>(map.length, map[0].length, { i: -1, j: -1, w: Infinity })
-        setMap(nodes, current, { i: -1, j: -1, w: 0 })
+        setMap(nodes, trailhead, { i: -1, j: -1, w: 0 })
 
-        trailtails.push(reachTrailtails(map, visited, nodes, [], current, undefined, copy))
+        const trailtails: Location[] = []
+        let cheapest = { i: -1, j: -1, w: Infinity }
+        let current = trailhead
+        do {
+            if (readMap(map, current) === END) {
+                trailtails.push(current)
+            }
 
-        if (!copy) {
-            printVisited(visited)
-        }
+            setMap(visited, current, true)
+    
+            const movements = getMovements(map, nodes, current)
+            for (const movement of movements) {
+                const node = readMap(nodes, movement)
+                if (node.w > movement.w) {
+                    setMap(nodes, movement, { ...current, w: movement.w })
+                }
+            }
+    
+            cheapest = { i: -1, j: -1, w: Infinity }
+            for (let i = 0; i < visited.length; i++) {
+                for (let j = 0; j < visited[i].length; j++) {
+                    const node = readMap(nodes, { i, j })
+                    // const movements = getMovements(map, visited, nodes, { i, j, w: node.w })
+                    if (!readMap(visited, { i, j }) && node.w < cheapest.w) {
+                        cheapest = { i, j, w: node.w }
+                    }
+                }
+            }
+            current = cheapest
+        } while (cheapest.w < Infinity)
+        trailtailGroups.push(trailtails)
+
+        printVisited(visited)
     }
-    return trailtails
+    return trailtailGroups
 }
 
-const cheapestTailtrailCosts = departFromTrailheads(topographicMap, true)
+const cheapestTailtrailCosts = departFromTrailheads(topographicMap)
     .map((trailtails) => trailtails.reduce((cw, { w }) => w < cw ? w : cw, Infinity))
 
 for (const cost of cheapestTailtrailCosts) {
