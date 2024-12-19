@@ -116,7 +116,9 @@ const departFromTrailheads = (map: string[][]) => {
     return trailtailGroups
 }
 
-const cheapestTailtrailCosts = departFromTrailheads(topographicMap)
+const trailtailGroups = departFromTrailheads(topographicMap)
+
+const cheapestTailtrailCosts = trailtailGroups
     .map((trailtails) => trailtails.reduce((cw, { w }) => w < cw ? w : cw, Infinity))
 
 for (const cost of cheapestTailtrailCosts) {
