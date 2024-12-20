@@ -3,28 +3,52 @@ import { readFileSync } from "fs"
 // Registers and pointers
 
 type Register = {
-    A: number,
-    B: number,
-    C: number,
+    A: bigint,
+    B: bigint,
+    C: bigint,
     out: number[]
 }
 
+type Halt = {
+    enabled: boolean
+    triggered: boolean
+    program: number[]
+}
+
 const register: Register = {
-    A: 0,
-    B: 0,
-    C: 0,
+    A: 0n,
+    B: 0n,
+    C: 0n,
     out: [],
 }
 
-let program: number[]
+let program: number[] = []
 let pointer = 0
+
+// Halting
+
+const halt: Halt = {
+    enabled: false,
+    triggered: false,
+    program: []
+}
+
+const haltRequired = () => {
+    if (!halt.enabled) {
+        return false
+    }
+    if (halt.program.length >= register.out.length) {
+        return false
+    }
+    return true
+}
 
 // Operands
 
 const literal = () => {
     const operand = program[pointer]
     pointer++
-    return operand
+    return BigInt(operand)
 }
 
 const combo = () => {
@@ -36,10 +60,10 @@ const combo = () => {
     }
 
     return {
-        0: 0,
-        1: 1,
-        2: 2,
-        3: 3,
+        0: 0n,
+        1: 1n,
+        2: 2n,
+        3: 3n,
         4: register.A,
         5: register.B,
         6: register.C,
@@ -82,15 +106,15 @@ const bxl = () => {
 
 const bst = () => {
     const value = combo()
-    register.B = value % 8
+    register.B = value % 8n
 }
 
 const jnz = () => {
     const value = register.A
-    if (value === 0) return
+    if (value === 0n) return
 
     const jump = literal()
-    pointer = jump
+    pointer = Number(jump)
 }
 
 const bxc = () => {
@@ -102,7 +126,8 @@ const bxc = () => {
 
 const out = () => {
     const value = combo()
-    register.out.push(value % 8)
+    register.out.push(Number(value % 8n))
+    if (haltRequired()) halt.triggered = true
 }
 
 const bdv = () => {
@@ -119,19 +144,60 @@ const cdv = () => {
 
 // Read program
 
-const [rawRegisterBlock, rawProgram] = readFileSync('./problems/day17/input.txt', 'utf8')
+const readNumbers = (input: string) => input.match(/\d+/ig)!.map(Number)
+
+const readProgramFile = () => {
+    const [rawRegisterBlock, rawProgram] = readFileSync('./problems/day17/input.txt', 'utf8')
     .replaceAll('\r', '')
     .split('\n\n')
 
-const rawRegisters = rawRegisterBlock.split('\n')
-register.A = rawRegisters[0].match(/\d+/ig)!.map(Number)[0]
-register.B = rawRegisters[1].match(/\d+/ig)!.map(Number)[0]
-register.C = rawRegisters[2].match(/\d+/ig)!.map(Number)[0]
+    const [[A], [B], [C]] = rawRegisterBlock.split('\n').map(readNumbers)
+    register.A = BigInt(A)
+    register.B = BigInt(B)
+    register.C = BigInt(C)
 
-program = rawProgram.match(/\d+/ig)!.map(Number)
-
-while (pointer < program.length) {
-    instruction()()
+    program = readNumbers(rawProgram)
+    return program
 }
 
-console.log(register.out.join(','))
+const runProgram = () => {
+    while (pointer < program.length && !halt.triggered) {
+        instruction()()
+    }
+    
+    return register.out
+}
+
+const compareInstruction = (initialRegisterA: bigint, copyPointer: number, reference: number[]): bigint => {
+    if (copyPointer < 0) return initialRegisterA
+
+    const bumpedRegisterA = initialRegisterA << 3n
+    for (let increment = 0n; increment < 8n; increment++) {
+        register.A = bumpedRegisterA + increment
+        register.B = 0n
+        register.C = 0n
+        register.out = []
+        pointer = 0
+        halt.triggered = false
+
+        const result = runProgram()
+        if (result[0] === reference[copyPointer]) {
+            const updatedRegisterA = compareInstruction(bumpedRegisterA + increment, copyPointer - 1, reference)
+            if (updatedRegisterA !== -1n) return updatedRegisterA
+        }
+    }
+
+    return -1n
+}
+
+const lookForSelfCopy = (reference: number[]) => {
+    halt.enabled = true
+    halt.program = reference
+    
+    return compareInstruction(0n, reference.length - 1, reference)
+}
+
+const rawProgram = readProgramFile()
+
+console.log('Original program output:', runProgram().join(','))
+console.log('Self copy program register A', lookForSelfCopy(rawProgram))
